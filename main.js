@@ -16,8 +16,10 @@ const asar = require('./asar');
 const app = electron.app
 const BrowserWindow = electron.BrowserWindow
 var fileurl = 'https://github.com/Jiiks/BetterDiscordApp/archive/stable16.zip';
-var discordpath = "/Applications/Discord.app/Contents/Resources/";
-var a = new asar(discordpath+'app.asar');
+var basedir = `${process.env.HOME}/Library/Application Support/discord`
+var version = fs.readdirSync(basedir).filter(f => fs.lstatSync(basedir + "/" + f).isDirectory() && f.split(".").length > 1).sort().reverse()[0];
+var discordpath = `${basedir}/${version}/modules/discord_desktop_core/`;
+var a = new asar(discordpath+'core.asar');
 var discordexec = "/Applications/Discord.app"
 let mainWindow
 
@@ -85,18 +87,18 @@ ipc.on('closeDiscord', function (event,data){
 
 
 ipc.on('appChecker', function (event, data){
-  if (fs.existsSync(discordpath+'app')) {
+  if (fs.existsSync(discordpath+'core')) {
     try {
-      (execSync('rm -rf '+discordpath+'app'))
+      (execSync('rm -rf "'+discordpath+'core"'))
       event.sender.send('appChecked', true);
-      console.log('deleted app folder');
+      console.log('deleted core folder');
     } catch (err) {
-      console.log('failed to delete app file');
+      console.log('failed to delete core file');
       event.sender.send('appChecked', false);
     }
   } else {
     event.sender.send('appChecked', true);
-      console.log('No app folder found');
+      console.log('No core folder found');
   }
 });
 ipc.on('startAsar', function (event, data){
@@ -159,9 +161,12 @@ function downloadZipfile(fileurl, event){
   .pipe(fs.createWriteStream('/tmp/stable16.zip'))
   .on('close', function () {
     console.log('BetterDiscord modules saved to /tmp/stable16.zip');
-    fs.createReadStream('/tmp/stable16.zip').pipe(unzip.Extract({ path: discordpath+"app/node_modules/" }).on('close', function(){
+    fs.createReadStream('/tmp/stable16.zip').pipe(unzip.Extract({ path: discordpath+"core/app/node_modules/" }).on('close', function(){
       console.log('moving to node_modules and renaming to betterdiscord')
-      fs.rename(discordpath+"app/node_modules/BetterDiscordApp-stable16", discordpath+"app/node_modules/betterdiscord", function (err) {
+	  if (fs.existsSync(discordpath+"core/app/node_modules/betterdiscord")) {
+		  execSync('rmdir "' + discordpath+'core/app/node_modules/betterdiscord"');
+	  }
+      fs.rename(discordpath+"core/app/node_modules/BetterDiscordApp-stable16", discordpath+"core/app/node_modules/betterdiscord", function (err) {
         if (err) {
           throw err;
           console.log('Error thrown during file move');
@@ -176,8 +181,9 @@ function downloadZipfile(fileurl, event){
 }
 
 function injectBD(event){
+	fs.writeFileSync(discordpath+'index.js', "module.exports = require('./core');");
 		var lines = [];
-		var linereader = readline.createInterface({input: fs.createReadStream(discordpath+'app/index.js')});
+		var linereader = readline.createInterface({input: fs.createReadStream(discordpath+'core/app/mainScreen.js')});
     try {
       linereader.on('line', line => {
         lines.push(line);
@@ -186,12 +192,12 @@ function injectBD(event){
           lines.push("var _betterDiscord2;");
         }
 
-        if(line.indexOf("mainWindow = new BrowserWindow(mainWindowOptions);") > -1) { 
+        if(line.indexOf("mainWindow = new") > -1) { 
           lines.push('    _betterDiscord2 = new _betterDiscord.BetterDiscord(mainWindow, false);');
         }
       });
       linereader.on('close', () => {
-        fs.writeFileSync(discordpath+'app/index.js', lines.join('\n'));
+        fs.writeFileSync(discordpath+'core/app/mainScreen.js', lines.join('\n'));
         event.sender.send('injectComplete',true);
       });
     } catch (err){

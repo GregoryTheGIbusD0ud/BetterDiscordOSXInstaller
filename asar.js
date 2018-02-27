@@ -35,9 +35,9 @@ class Asar {
 		this.walker.on('file', (root, stat, next) => {
 			this.files.push(`${root}/${stat.name}`);
 			try {
-				fs.statSync(root.replace("app.asar", "app"));
+				fs.statSync(root.replace("core.asar", "core"));
 			} catch(err) {
-				fs.mkdirPSync(root.replace("app.asar", "app"));
+				fs.mkdirPSync(root.replace("core.asar", "core"));
 			}
 			next();
 		});
@@ -50,7 +50,7 @@ class Asar {
 
 			function copy(files, index) {
 				if(index >= filecount) {
-					statusCb("Finished extracting app package");
+					statusCb("Finished extracting core package");
 					cb(null);
 					return;
 				}
@@ -63,7 +63,7 @@ class Asar {
 	}
 
 	copyfile(files, index, cb) {
-		fs.writeFileSync(files[index].replace("app.asar", "app"), fs.readFileSync(files[index]));
+		fs.writeFileSync(files[index].replace("core.asar", "core"), fs.readFileSync(files[index]));
 		cb(files, index+1);
 	}
 }
